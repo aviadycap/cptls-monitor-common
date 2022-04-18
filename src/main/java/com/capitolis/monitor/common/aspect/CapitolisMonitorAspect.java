@@ -7,25 +7,33 @@ import static com.capitolis.monitor.common.util.monitorMessageExtractor.extractT
 
 import com.capitolis.monitor.common.model.MonitorMessage;
 import com.capitolis.monitor.common.service.KafkaMonitorPublisher;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
 
+
+@ConditionalOnProperty(prefix = "capitolis.monitor", name = "enabled")
 @Aspect
 @Component
 @Slf4j
-@RequiredArgsConstructor
 public class CapitolisMonitorAspect {
 
     @Value("${SERVICE_NAME}")
     private String serviceName;
 
     private final KafkaMonitorPublisher KafkaMonitorPublisher;
+
+
+    public CapitolisMonitorAspect(com.capitolis.monitor.common.service.KafkaMonitorPublisher kafkaMonitorPublisher) {
+        KafkaMonitorPublisher = kafkaMonitorPublisher;
+
+        log.info("Init CapitolisMonitorAspect");
+    }
 
 
     @Around(value = "@annotation(com.capitolis.monitor.common.aspect.CapitolisMonitor)")

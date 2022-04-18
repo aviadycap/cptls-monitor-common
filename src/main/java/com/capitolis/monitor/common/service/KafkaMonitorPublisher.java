@@ -9,10 +9,12 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
 
 
+@ConditionalOnProperty(prefix = "capitolis.monitor", name = "enabled")
 @Slf4j
 @Service
 public class KafkaMonitorPublisher implements MonitorResultPublisher {
@@ -30,6 +32,7 @@ public class KafkaMonitorPublisher implements MonitorResultPublisher {
     @Override
     public boolean publish(MonitorMessage monitorMessage) {
         boolean isMessageSent = true;
+
         try {
             log.info("Publishing monitor result for request id {} to kafka on topic {}, spanName {}", monitorMessage.getTraceId(), kafkaMonitorTopicName, monitorMessage.getSpanName());
             producer.send(new ProducerRecord<>(kafkaMonitorTopicName, monitorMessage));
@@ -42,6 +45,7 @@ public class KafkaMonitorPublisher implements MonitorResultPublisher {
         return isMessageSent;
     }
 
+    @ConditionalOnProperty(prefix = "capitolis.monitor", name = "enabled")
     @Bean
     protected static Producer<String, MonitorMessage> createMonitorProducer(
             @Value("${self.producerProps}") String producerPropsFile,
