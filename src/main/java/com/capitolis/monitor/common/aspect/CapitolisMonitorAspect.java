@@ -1,12 +1,10 @@
 package com.capitolis.monitor.common.aspect;
 
-import static com.capitolis.monitor.common.util.monitorMessageExtractor.extractMethodData;
-import static com.capitolis.monitor.common.util.monitorMessageExtractor.extractSpanName;
-import static com.capitolis.monitor.common.util.monitorMessageExtractor.extractSpanStatus;
-import static com.capitolis.monitor.common.util.monitorMessageExtractor.extractTraceId;
-
 import com.capitolis.monitor.common.model.MonitorMessage;
 import com.capitolis.monitor.common.service.KafkaMonitorPublisher;
+import com.capitolis.monitor.common.service.SignatureElements;
+import com.capitolis.monitor.common.util.MonitorMessageCreator;
+import com.capitolis.monitor.common.util.SignatureElementsCreator;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -14,7 +12,6 @@ import org.aspectj.lang.annotation.Aspect;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StopWatch;
 
 
 @ConditionalOnProperty(prefix = "capitolis.monitor", name = "enabled")
@@ -26,52 +23,42 @@ public class CapitolisMonitorAspect {
     @Value("${SERVICE_NAME}")
     private String serviceName;
 
-    private final KafkaMonitorPublisher KafkaMonitorPublisher;
+    private final KafkaMonitorPublisher kafkaMonitorPublisher;
 
 
     public CapitolisMonitorAspect(com.capitolis.monitor.common.service.KafkaMonitorPublisher kafkaMonitorPublisher) {
-        KafkaMonitorPublisher = kafkaMonitorPublisher;
+        this.kafkaMonitorPublisher = kafkaMonitorPublisher;
 
         log.info("Init CapitolisMonitorAspect");
     }
 
 
-    @Around(value = "@annotation(com.capitolis.monitor.common.aspect.CapitolisMonitor)")
+    @Around(value = "@annotation(com.capitolis.monitor.common.api.CapitolisMonitor)")
     public Object aroundAdvice(ProceedingJoinPoint joinPoint) throws Throwable {
         log.info("Around method:" + joinPoint.getSignature());
-        StopWatch stopWatch = new StopWatch();
-        stopWatch.start();
+        long startTime = System.currentTimeMillis();
 
         Object result = null;
         try {
             result = joinPoint.proceed();
-            handleAfter(joinPoint, stopWatch, result);
+            long duration = System.currentTimeMillis() - startTime;
+            handleAfter(joinPoint, duration, result);
+        } catch (UnsatisfiedLinkError unsatisfiedLinkError) {
+            log.info("aroundAdvice catch unsatisfiedLinkError");
         } catch (Throwable e) {
-            handleAfter(joinPoint, stopWatch, e);
+            long duration = System.currentTimeMillis() - startTime;
+            handleAfter(joinPoint, duration, e);
             throw e;
         }
 
         return result;
     }
 
-    private void handleAfter(ProceedingJoinPoint joinPoint, StopWatch stopWatch, Object result) {
-        stopWatch.stop();
+    private void handleAfter(ProceedingJoinPoint joinPoint, long durationInMillis, Object result) {
+        SignatureElements signatureElements = SignatureElementsCreator.create(joinPoint, result);
+        MonitorMessage monitorMessage = MonitorMessageCreator.create(signatureElements, serviceName, durationInMillis);
 
-        String message = extractMethodData(joinPoint);
-        String traceId = extractTraceId(joinPoint);
-        String spanName = extractSpanName(joinPoint);
-        String spanStatus = extractSpanStatus(result);
-
-        MonitorMessage monitorMessage = MonitorMessage.builder()
-                .serviceName(serviceName)
-                .spanName(spanName)
-                .spanStatus(spanStatus)
-                .traceId(traceId)
-                .message(message)
-                .durationInMillis(stopWatch.getTotalTimeMillis())
-                .build();
-
-        KafkaMonitorPublisher.publish(monitorMessage);
+        kafkaMonitorPublisher.publish(monitorMessage);
     }
 
 }

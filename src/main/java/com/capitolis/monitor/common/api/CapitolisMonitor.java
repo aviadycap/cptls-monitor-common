@@ -1,4 +1,4 @@
-package com.capitolis.monitor.common.aspect;
+package com.capitolis.monitor.common.api;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -10,5 +10,10 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface CapitolisMonitor {
 
-    String spanName();
+    /**
+     *
+     * @return the Monitor event description. keep it small and informative.
+     */
+    String taskDescription();
+
 }

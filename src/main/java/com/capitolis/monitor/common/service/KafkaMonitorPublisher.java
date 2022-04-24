@@ -34,9 +34,11 @@ public class KafkaMonitorPublisher implements MonitorResultPublisher {
         boolean isMessageSent = true;
 
         try {
-            log.info("Publishing monitor result for request id {} to kafka on topic {}, spanName {}", monitorMessage.getTraceId(), kafkaMonitorTopicName, monitorMessage.getSpanName());
+            monitorMessage.adjustStringLength(); // term attributes size
+            log.info("Publishing monitor result for request id {} to kafka on topic {}, taskDescription {}"
+                    , monitorMessage.getTraceId(), kafkaMonitorTopicName, monitorMessage.getTaskDescription());
             producer.send(new ProducerRecord<>(kafkaMonitorTopicName, monitorMessage));
-            log.info("Published monitor message {}", monitorMessage, monitorMessage.getSpanName());
+            log.info("Published monitor message {}", monitorMessage);
         } catch(Exception ex) {
             log.error("Failed to send monitor message {}", monitorMessage, ex);
             isMessageSent = false;
